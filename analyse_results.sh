@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --job-name=ALBERTS_BMORG
+#SBATCH --job-name=analyse_albt
 #SBATCH --account=CHEM014742
 #SBATCH --partition=veryshort
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=16GB
-#SBATCH --time=03:00:00
+#SBATCH --time=01:00:00
 
-echo 'training the neural network'
+echo 'running predictions'
 
 #gpu_veryshort appears to no longer exist
 #hostname
@@ -24,4 +24,4 @@ source ~/initMamba.sh
 mamba activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/generate_input.py --analytical_data=data --out_path=alberts_model --h_nmr --c_nmr --formula
+python benchmark/analyse_results.py --pred_path=alberts_model/data/prd-test.txt --test_path=alberts_model/data/tgt-test.txt

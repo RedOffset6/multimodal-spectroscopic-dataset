@@ -56,12 +56,26 @@ def main(template_path: str, output_path: str, seed: int):
     print('Starting training...')
     train_logs_path = os.path.join(log_path, 'train')
     job_log = os.path.join(train_logs_path, 'sub.log')
-
+    print("started job log")
     os.makedirs(train_logs_path, exist_ok=True)
+    print("made train logs")
+#    with open(job_log, 'w') as out:
+#        subprocess.call(['bsub', '-q', 'normal', '-gpu', '"num=1"', '-n', '1', '-R', 'rusage[ngpus=1,mem=25,cpu=8]', '-o', str(Path(output_path) / 'test.out'), '-e', str(Path(output_path) / 'test.err'), 'onmt_train', '-config', input_file_path], stdout=out, stderr=out)
 
     with open(job_log, 'w') as out:
-        subprocess.call(['bsub', '-q', 'normal', '-gpu', '"num=1"', '-n', '1', '-R', 'rusage[ngpus=1,mem=25,cpu=8]', '-o', str(Path(output_path) / 'test.out'), '-e', str(Path(output_path) / 'test.err'), 'onmt_train', '-config', input_file_path], stdout=out, stderr=out)
+        subprocess.call([
+            'srun',
+            '--gres=gpu:1',
+            '--cpus-per-task=1',
+            '--mem=25G',
+            'onmt_train',
+            '-config', input_file_path
+        ], stdout=out, stderr=out)
 
+
+
+
+    print("successful call to subprocess")
 parser = argparse.ArgumentParser(description='Run transformer training from data creation to inference.')
 parser.add_argument('--output_path', required=True, help='Output folder')
 parser.add_argument('--template_path', default='./benchmark/transformer_template.yaml', help='Output folder')
@@ -71,3 +85,5 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
     main(args.template_path, args.output_path, args.seed)
+
+
