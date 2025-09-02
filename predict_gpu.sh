@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH --gres=gpu:1
 echo 'training the neural network'
 
@@ -24,5 +24,6 @@ source ~/initMamba.sh
 mamba activate multispecdata
 echo "after activation: $(which python)"
 
-onmt_translate -model=alberts_model/model_step_250000.pt -src=alberts_model/data/src-test.txt -output=alberts_model/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
+#onmt_translate -model=alberts_model/model_step_250000.pt -src=alberts_model/data/src-test.txt -output=alberts_model/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
 
+onmt_translate -model=vanilla_alb_full_data/model_step_250000.pt -src=vanilla_alb_full_data/data/src-test.txt -output=vanilla_alb_full_data/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0

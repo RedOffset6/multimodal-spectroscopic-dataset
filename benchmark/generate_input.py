@@ -55,6 +55,28 @@ def process_cnmr(carbon_nmr: List[Dict[str, Union[str, float, int]]]) -> str:
 
     return nmr_string
 
+def process_cosy(cosy) -> str:
+    nmr_string = "COSY "
+    for peak in cosy:
+        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
+
+    return nmr_string
+
+def process_hsqc(hsqc) -> str:
+    nmr_string = "HSQC "
+    for peak in hsqc:
+        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
+
+    return nmr_string
+
+def process_hmbc(hmbc) -> str:
+    nmr_string = "HMBC "
+    for peak in hmbc:
+        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
+
+    return nmr_string
+
+
 def process_ir(ir: np.ndarray, interpolation_points: int = 400) -> str:
     original_x = np.linspace(400, 4000, 1800)
     interpolation_x = np.linspace(400, 4000, interpolation_points)
@@ -85,7 +107,10 @@ def tokenise_data(
     ir: bool,
     pos_msms: bool, 
     neg_msms: bool,
-    formula: bool
+    formula: bool,
+    cosy: bool,
+    hsqc: bool,
+    hmbc: bool
 ):
     input_list = list()
 
@@ -104,6 +129,19 @@ def tokenise_data(
         if c_nmr:
             c_nmr_string = process_cnmr(data.iloc[i]['c_nmr_peaks'])
             tokenized_input += c_nmr_string
+
+        if cosy:
+            cosy_string = process_cosy(data.iloc[i]['cosy'])
+            tokenized_input += cosy_string
+        
+        if hsqc:
+            hsqc_string = process_hsqc(data.iloc[i]['hsqc'])
+            tokenized_input += hsqc_string
+
+        if hmbc:
+            hmbc_string = process_hmbc(data.iloc[i]['hmbc'])
+            tokenized_input += hmbc_string
+
 
         if ir:
             ir_string = process_ir(data.iloc[i]["ir_spectra"])
@@ -125,6 +163,7 @@ def tokenise_data(
         
         tokenized_target = tokenize_smiles(data.iloc[i]["smiles"])
         input_list.append({'source': tokenized_input.strip(), 'target': tokenized_target})
+
 
     input_df = pd.DataFrame(input_list)
     input_df = input_df.drop_duplicates(subset="source")
@@ -180,6 +219,9 @@ def save_set(data_set: pd.DataFrame, out_path: Path, set_type: str, pred_spectra
 @click.option("--formula", is_flag=True)
 @click.option("--pred_spectra", is_flag=True)
 @click.option("--seed", type=int, default=3245)
+@click.option("--cosy", is_flag=True)
+@click.option("--hsqc", is_flag=True)
+@click.option("--hmbc", is_flag=True)
 def main(
     analytical_data: Path,
     out_path: Path,
@@ -190,7 +232,10 @@ def main(
     neg_msms: bool = False,
     formula: bool = True,
     pred_spectra: bool = False,
-    seed: int = 3245
+    seed: int = 3245,
+    cosy: bool = False,
+    hsqc: bool = False,
+    hmbc: bool = False
 ):  
     
     # Make the training data
@@ -198,8 +243,9 @@ def main(
     for parquet_file in tqdm(analytical_data.glob("*.parquet"), total=245):
         print(parquet_file.stem)
         data = pd.read_parquet(parquet_file)
-        tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula))
+        tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc))
         del data
+
 
     tokenised_data = pd.concat(tokenised_data)
 
