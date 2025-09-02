@@ -24,4 +24,4 @@ source ~/initMamba.sh
 mamba activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/generate_input.py --analytical_data=data --out_path=alberts_model --h_nmr --c_nmr --formula
+python benchmark/generate_input.py --analytical_data=data_imp_2d --out_path=hmbc --h_nmr --c_nmr --formula --hmbc

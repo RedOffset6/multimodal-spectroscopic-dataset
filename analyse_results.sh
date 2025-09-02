@@ -24,4 +24,4 @@ source ~/initMamba.sh
 mamba activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/analyse_results.py --pred_path=alberts_model/data/prd-test.txt --test_path=alberts_model/data/tgt-test.txt
+python benchmark/analyse_results.py --pred_path=vanilla_alb_full_data/data/prd-test.txt --test_path=vanilla_alb_full_data/data/tgt-test.txt
