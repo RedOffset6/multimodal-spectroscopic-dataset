@@ -24,4 +24,4 @@ source ~/initMamba.sh
 mamba activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/start_training.py --output_path=vanilla_alb_full_data
+python benchmark/start_training.py --output_path=1d_only_no_formula

@@ -6,9 +6,11 @@
 #SBATCH --ntasks=1               
 #SBATCH --cpus-per-task=1          
 #SBATCH --mem=32GB
-#SBATCH --time=0-04:00:00
+#SBATCH --time=0-05:00:00
 #SBATCH --array=000-244
 echo 'training the neural network'
+
+#SUBMIT FOR FOUR HOURS TO COMPLETELY COMPUTE THE DATA
 
 #gpu_veryshort appears to no longer exist
 #hostname
