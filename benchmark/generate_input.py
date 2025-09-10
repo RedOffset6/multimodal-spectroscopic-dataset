@@ -76,6 +76,25 @@ def process_hmbc(hmbc) -> str:
 
     return nmr_string
 
+def process_nnmr(n_nmr) -> str:
+    nmr_string = "15N "
+    for peak in n_nmr:
+        nmr_string += f"{peak} | "
+
+    return nmr_string
+
+def process_fnmr(f_nmr) -> str:
+    """Convert a list of fluorine NMR peaks into a formatted string."""
+    nmr_string = "19F "
+
+    # Handle None or empty input
+    if f_nmr is None:
+        return nmr_string
+
+    for peak in f_nmr:
+        nmr_string += f"{peak} | "
+    return nmr_string
+
 
 def process_ir(ir: np.ndarray, interpolation_points: int = 400) -> str:
     original_x = np.linspace(400, 4000, 1800)
@@ -110,7 +129,9 @@ def tokenise_data(
     formula: bool,
     cosy: bool,
     hsqc: bool,
-    hmbc: bool
+    hmbc: bool,
+    f_nmr: bool,
+    n_nmr: bool
 ):
     input_list = list()
 
@@ -141,7 +162,14 @@ def tokenise_data(
         if hmbc:
             hmbc_string = process_hmbc(data.iloc[i]['hmbc'])
             tokenized_input += hmbc_string
-
+        
+        if f_nmr:
+            f_nmr_string = process_fnmr(data.iloc[i]['fluorine'])
+            tokenized_input += f_nmr_string
+        
+        if n_nmr:
+            n_nmr_string = process_nnmr(data.iloc[i]['nitrogen'])
+            tokenized_input += n_nmr_string
 
         if ir:
             ir_string = process_ir(data.iloc[i]["ir_spectra"])
@@ -163,6 +191,9 @@ def tokenise_data(
         
         tokenized_target = tokenize_smiles(data.iloc[i]["smiles"])
         input_list.append({'source': tokenized_input.strip(), 'target': tokenized_target})
+
+
+
 
 
     input_df = pd.DataFrame(input_list)
@@ -222,6 +253,8 @@ def save_set(data_set: pd.DataFrame, out_path: Path, set_type: str, pred_spectra
 @click.option("--cosy", is_flag=True)
 @click.option("--hsqc", is_flag=True)
 @click.option("--hmbc", is_flag=True)
+@click.option("--f_nmr", is_flag=True)
+@click.option("--n_nmr", is_flag=True)
 def main(
     analytical_data: Path,
     out_path: Path,
@@ -235,7 +268,9 @@ def main(
     seed: int = 3245,
     cosy: bool = False,
     hsqc: bool = False,
-    hmbc: bool = False
+    hmbc: bool = False,
+    f_nmr: bool = False,
+    n_nmr: bool = False
 ):  
     
     # Make the training data
@@ -243,7 +278,7 @@ def main(
     for parquet_file in tqdm(analytical_data.glob("*.parquet"), total=245):
         print(parquet_file.stem)
         data = pd.read_parquet(parquet_file)
-        tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc))
+        tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc, f_nmr, n_nmr))
         del data
 
 

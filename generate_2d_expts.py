@@ -36,17 +36,6 @@ def plot_peaks(peaks, title, xlabel, ylabel, filename):
 
 
 def build_2d_experiments(atoms_df, pairs_df):
-    #print(len(atoms_df))
-    #print(atoms_df)
-    #atoms_df.to_csv("atoms.csv", index=False)
-    #print(atoms_df)
-    #loops through pairs
-    #pairs_df.to_csv("pairs.csv", index=False)
-
-    #if atom index 0 == atom index 1 then both atoms in the pair are the same atom and should be ignored
-    #by removing indeces where atom 0 > atom 1 each pair will only be considered once (index 0 and index 1 will be compared but index 1 and 0 will not)
-
-
 
     pairs_df = pairs_df[pairs_df["atom_index_0"] <= pairs_df["atom_index_1"]]
 
@@ -99,7 +88,7 @@ def build_2d_experiments(atoms_df, pairs_df):
         ################
 
         #checks to see if both atoms are Hydrogen and the scalar coupling is greater than 2Hz (e.g could show up in
-        = 100):
+        if (((atom_type_0 == 1) and (atom_type_1 == 6)) or ((atom_type_0 == 6) and (atom_type_1 == 1))) and (abs(row["predicted_coupling"]) >= 100):
             shift0 = atoms_df.iloc[atom_index_0]["predicted_shift"]
             shift1 = atoms_df.iloc[atom_index_1]["predicted_shift"]
             
@@ -144,65 +133,47 @@ def build_2d_experiments(atoms_df, pairs_df):
 
 
 
-#
-#Non Parallel version of main 
-#
+def build_exotic_1d(atoms_df, pairs_df):
+    fluorine_list = []
+    nitrogen_list = []
+    proton_list = []
+    carbon_list = []
 
-# def main():
-#     print("HELLO")
-#     #converts the data type to a Path
-#     analytical_data = Path("../../alberts/multimodal-spectroscopic-dataset/data")
+    # iterate through rows in the atoms dataframe
+    for index, row in atoms_df.iterrows():
+        atom_type = row["typeint"]
 
-#     # print("HELLO2")
-#     imp = IMPRESSION(model_path='utils/model/PAPER_DT456E_15IQR_CLEANED_OPT_checkpoint.torch')
+        # fluorine
+        if atom_type == 9:
+            shift = row["predicted_shift"]
+            fluorine_list.append(shift)
 
-
-#     #loops through the parquet files
-#     for parquet_file in analytical_data.glob("*.parquet"):
-#         print(f"working on {parquet_file.stem}")
-#         start = time.time()
-#         data = pd.read_parquet(parquet_file)
-
-#         # add coloumns for the impression outputs
-#         for col in ["cosy", "hsqc", "hmbc", "imp_atoms_df", "imp_pairs_df"]:
-#             if col not in data.columns:
-#                 data[col] = None
+        # nitrogen
+        if atom_type == 7:
+            shift = row["predicted_shift"]
+            nitrogen_list.append(np.abs(shift))
         
+                # nitrogen
+        if atom_type == 1:
+            shift = row["predicted_shift"]
+            proton_list.append(np.abs(shift))
         
-#         for index, molecule in data.iterrows():
-#             print(molecule["smiles"])
-#             #Run impression and return the atoms, and pairs dataframes datastructure
+        if atom_type == 6:
+            shift = row["predicted_shift"]
+            carbon_list.append(np.abs(shift))
 
-#             start_imp = time.time()
-#             atoms_df, pairs_df = imp.predict_from_files([molecule["smiles"]])
-#             end_imp = time.time()
-#             print(f"time spent on impression call: {end_imp - start_imp:.2f} seconds")
 
-#             #generate mock versions of the 2d experiments
-#             cosy_list, hsqc_list, hmbc_list = build_2d_experiments(atoms_df, pairs_df)
-            
-#             data.at[index, "cosy"] = cosy_list
-#             data.at[index, "hsqc"] = hsqc_list
-#             data.at[index, "hmbc"] = hmbc_list
-#             data.at[index, "imp_atoms_df"] = atoms_df.to_json(orient="records")
-#             data.at[index, "imp_pairs_df"] = pairs_df.to_json(orient="records")
-#             break
-#         end = time.time()
-#         print(f"Total time: {end - start:.2f} seconds")
-#         # Save as new parquet
-#         output_path = Path("../../alberts/multimodal-spectroscopic-dataset/data_imp")
-#         save_path = output_path / f"{parquet_file.stem}_imp.parquet"
-#         data.to_parquet(save_path, engine="pyarrow", index=False)
-#         break
+    return fluorine_list, nitrogen_list, proton_list, carbon_list
+
 
 def process_file(file_path, file_number):
     start = time.time()
-    print("A new thread says Hi")
-    print("beginning to read parquet")
+    # print("A new thread says Hi")
+    # print("beginning to read parquet")
     data = pd.read_parquet(file_path)
 
     # add coloumns for the 2d experiment outputs
-    for col in ["cosy", "hsqc", "hmbc" ]:
+    for col in ["cosy", "hsqc", "hmbc", "fluorine", "nitrogen", "imp_proton", "imp_carbon" ]:
         if col not in data.columns:
             data[col] = None
     
@@ -219,52 +190,39 @@ def process_file(file_path, file_number):
         
         smile_string = molecule["smiles"]
 
-        print("RETURNING THE ATOMS DF FOR MY MOLECULE")
+        #print("RETURNING THE ATOMS DF FOR MY MOLECULE")
         atoms = atoms_df[atoms_df["molecule_name"]==smile_string]
         pairs = pairs_df[pairs_df["molecule_name"]==smile_string]
 
+        #gets the 2d experiment lists
         cosy_list, hsqc_list, hmbc_list = build_2d_experiments(atoms, pairs)
+
+        fluorine_list, nitrogen_list, proton_list, carbon_list = build_exotic_1d(atoms, pairs)
 
         #saves the new data
         data.at[index, "cosy"] = cosy_list
         data.at[index, "hsqc"] = hsqc_list
         data.at[index, "hmbc"] = hmbc_list
+        data.at[index, "fluorine"] = fluorine_list
+        data.at[index, "nitrogen"] = nitrogen_list
+        data.at[index, "imp_proton"] = proton_list
+        data.at[index, "imp_carbon"] = carbon_list
+        
 
         #end_loop = time.time()
 
         #print(f"\n\n2D STRUCTURE GEN CALL TIMING\n\ntime spent on impression call: {end_loop - start_loop:.2f} seconds\n\n")
 
+    
+    #UNHASH TO SAVE THE DATA
+    ######################################################################################
 
-    save_path = f"data_imp_2d/aligned_chunk_{file_number}.parquet"
+
+    save_path = f"data_imp_2d_expanded/aligned_chunk_{file_number}.parquet"
     data.to_parquet(save_path, engine="pyarrow", index=False)
-        #Run impression and return the atoms, and pairs dataframes datastructure
-        
-    #     print("Beginning impression call")
-    #     start_imp = time.time()
-    #     atoms_df, pairs_df = imp.predict_from_files([molecule["smiles"]])
-    #     end_imp = time.time()
-    #     print(f"\n\nIMPRESSION CALL TIMING\n\ntime spent on impression call: {end_imp - start_imp:.2f} seconds\n\n")
- 
-    #     print(f"PRINTING ATOMS DF\n\n\n\ {atoms_df}")
 
-    #     print(f"PRINTING PAIRS DF\n\n\n\ {pairs_df}")
 
-    #     # #generate mock versions of the 2d experiments
-    #     # cosy_list, hsqc_list, hmbc_list = build_2d_experiments(atoms_df, pairs_df)
-        
-    #     # data.at[index, "cosy"] = cosy_list
-    #     # data.at[index, "hsqc"] = hsqc_list
-    #     # data.at[index, "hmbc"] = hmbc_list
-    #     # data.at[index, "imp_atoms_df"] = atoms_df.to_json(orient="records")
-    #     # data.at[index, "imp_pairs_df"] = pairs_df.to_json(orient="records")
-    #     break
-    # end = time.time()
-    # print(f"Total time: {end - start:.2f} seconds")
-    # # Save as new parquet
-    # output_path = Path("../../alberts/multimodal-spectroscopic-dataset/data_imp")
-    # save_path = output_path / f"aligned_chunk_{file_number}.parquet"
-    # data.to_parquet(save_path, engine="pyarrow", index=False)
-
+    #######################################################################################
 
 def main():
     start = time.time()
