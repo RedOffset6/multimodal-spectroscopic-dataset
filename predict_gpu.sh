@@ -26,4 +26,4 @@ echo "after activation: $(which python)"
 
 #onmt_translate -model=alberts_model/model_step_250000.pt -src=alberts_model/data/src-test.txt -output=alberts_model/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
 
-onmt_translate -model=hmbc/model_step_250000.pt -src=hmbc/data/src-test.txt -output=hmbc/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
+onmt_translate -model=1d_only_no_formula/model_step_250000.pt -src=1d_only_no_formula/data/src-test.txt -output=1d_only_no_formula/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
