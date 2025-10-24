@@ -1,12 +1,11 @@
 #!/bin/bash
 
 #SBATCH --job-name=vanila_Train_BMORG
-#SBATCH --account=CHEM014742
-#SBATCH --partition=gpu
+#SBATCH --partition=workq
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
-#SBATCH --time=7-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --gres=gpu:1
 echo 'training the neural network'
 
@@ -16,12 +15,12 @@ echo 'training the neural network'
 #account CHEM014742
 #module load languages/miniconda
 #module load libs/cuda/12.0.0-gcc-9.1.0
-module load cuda/12.4.0-z7k5
+module load cuda/12.6
 
 echo "before activation: $(which python)"
 
-source ~/initMamba.sh
-mamba activate multispecdata
+source ~/miniforge3/bin/activate
+conda activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/start_training.py --output_path=all_1d
+python benchmark/start_training.py --output_path=test

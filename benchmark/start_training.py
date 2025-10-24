@@ -67,7 +67,7 @@ def main(template_path: str, output_path: str, seed: int):
             'srun',
             '--gres=gpu:1',
             '--cpus-per-task=1',
-            '--mem=25G',
+            '--mem=64G',
             'onmt_train',
             '-config', input_file_path
         ], stdout=out, stderr=out)
