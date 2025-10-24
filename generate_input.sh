@@ -1,11 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=ALBERTS_BMORG
-#SBATCH --account=CHEM014742
-#SBATCH --partition=veryshort
+#SBATCH --job-name=Generate_Input
+#SBATCH --partition=workq
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=16GB
+#SBATCH --mem=64GB
 #SBATCH --time=03:00:00
 
 echo 'training the neural network'
@@ -20,8 +19,8 @@ echo 'training the neural network'
 
 echo "before activation: $(which python)"
 
-source ~/initMamba.sh
-mamba activate multispecdata
+source ~/miniforge3/bin/activate
+conda activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/generate_input.py --analytical_data=data_imp_2d_expanded --out_path=everything --formula --c_nmr --h_nmr --f_nmr --n_nmr --cosy --hsqc --hmbc
+python benchmark/generate_input.py --analytical_data=data_imp_2d --out_path=test --formula --c_nmr --h_nmr --cosy --hsqc --hmbc
