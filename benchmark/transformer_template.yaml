@@ -56,7 +56,7 @@ decay_method: noam
 learning_rate: 2.0
 max_grad_norm: 0.0
 
-batch_size: 4096
+batch_size: 4098
 batch_type: tokens
 normalization: tokens
 dropout: 0.1

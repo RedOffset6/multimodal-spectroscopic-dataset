@@ -1,8 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=Alberts_test_BMORG
-#SBATCH --account=CHEM014742
-#SBATCH --partition=gpu
+#SBATCH --partition=workq
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
@@ -16,14 +15,16 @@ echo 'training the neural network'
 #account CHEM014742
 #module load languages/miniconda
 #module load libs/cuda/12.0.0-gcc-9.1.0
-module load cuda/12.4.0-z7k5
+module load cuda/12.6
 
 echo "before activation: $(which python)"
 
-source ~/initMamba.sh
-mamba activate multispecdata
+source ~/miniforge3/bin/activate
+conda activate multispecdata
 echo "after activation: $(which python)"
 
 #onmt_translate -model=alberts_model/model_step_250000.pt -src=alberts_model/data/src-test.txt -output=alberts_model/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
 
-onmt_translate -model=1d_only_no_formula/model_step_250000.pt -src=1d_only_no_formula/data/src-test.txt -output=1d_only_no_formula/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
+onmt_translate -model=fn_1d_rounded/model_step_150000.pt -src=fn_1d_rounded/data/src-test.txt -output=fn_1d_rounded/data/prd-test.txt -beam_size=10 -n_best=10 -min_length=5 -gpu=0
+
+echo "200 files"

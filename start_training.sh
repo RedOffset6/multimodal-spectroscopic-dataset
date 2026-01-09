@@ -23,4 +23,4 @@ source ~/miniforge3/bin/activate
 conda activate multispecdata
 echo "after activation: $(which python)"
 
-python benchmark/start_training.py --output_path=test
+python benchmark/start_training.py --output_path=everything_rounded_spaces

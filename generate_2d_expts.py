@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyarrow
 import time
+from mpi4py import MPI
 
 
 def plot_peaks(peaks, title, xlabel, ylabel, filename):
@@ -208,7 +209,6 @@ def process_file(file_path, file_number):
         data.at[index, "imp_proton"] = proton_list
         data.at[index, "imp_carbon"] = carbon_list
         
-
         #end_loop = time.time()
 
         #print(f"\n\n2D STRUCTURE GEN CALL TIMING\n\ntime spent on impression call: {end_loop - start_loop:.2f} seconds\n\n")
@@ -225,15 +225,35 @@ def process_file(file_path, file_number):
     #######################################################################################
 
 def main():
-    start = time.time()
-    file_number = int(sys.argv[1])
+    # comm = MPI.COMM_WORLD
+    # rank = comm.Get_rank()
+    # size = comm.Get_size()
 
-    print(f"processing parquet file {file_number}")
-    file_path = Path(f"data_new/aligned_chunk_{file_number}.parquet")
+    # n = 244
+    # chunk = n // size
 
-    process_file(file_path, file_number)
-    end = time.time()
-    print(f"\n\nMAIN TIMING\n\ntime spent running main: {end - start:.2f} seconds\n\n")
+    # start = rank * chunk
+    # end = n if rank == size - 1 else start + chunk
+
+
+    # start_time = time.time()
+    
+    # # for file_number in range (0,244):
+    # for file_number in range (start,end):
+
+    #     print(f"processing parquet file {file_number}")
+    #     file_path = Path(f"data_imp_2d/aligned_chunk_{file_number}.parquet")
+
+    #     process_file(file_path, file_number)
+    # end_time = time.time()
+    # print(f"\n\nMAIN TIMING\n\ntime spent running main: {end_time - start_time:.2f} seconds\n\n")
+
+        #     print(f"processing parquet file {file_number}")
+    
+    file_path = Path(f"data_imp_2d/aligned_chunk_{244}.parquet")
+
+    process_file(file_path, 244)
+    # end_time = time.time()
 
 if __name__ == '__main__':
     main()
