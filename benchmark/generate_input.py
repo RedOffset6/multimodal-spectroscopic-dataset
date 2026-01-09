@@ -79,7 +79,7 @@ def process_hmbc(hmbc) -> str:
 def process_nnmr(n_nmr) -> str:
     nmr_string = "15N "
     for peak in n_nmr:
-        nmr_string += f"{peak} | "
+        nmr_string += f"{round(float(peak),1)} | "
 
     return nmr_string
 
@@ -89,10 +89,10 @@ def process_fnmr(f_nmr) -> str:
 
     # Handle None or empty input
     if f_nmr is None:
-        return nmr_string
+        return ""
 
     for peak in f_nmr:
-        nmr_string += f"{peak} | "
+        nmr_string += f"{round(float(peak), 1)} | "
     return nmr_string
 
 
@@ -274,12 +274,16 @@ def main(
 ):  
     
     # Make the training data
+    count = 1 
     tokenised_data = list()
     for parquet_file in tqdm(analytical_data.glob("*.parquet"), total=245):
-        print(f"working on {parquet_file.stem}")
-        data = pd.read_parquet(parquet_file)
-        tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc, f_nmr, n_nmr))
-        del data
+
+        if count < 1000:
+            print(f"working on {parquet_file.stem}")
+            data = pd.read_parquet(parquet_file)
+            tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc, f_nmr, n_nmr))
+            del data
+        count = count + 1
 
 
     tokenised_data = pd.concat(tokenised_data)
