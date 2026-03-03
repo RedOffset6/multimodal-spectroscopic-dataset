@@ -1,300 +1,222 @@
-from pathlib import Path
-
-import click
 import pandas as pd
-from tqdm.auto import tqdm
-from typing import Tuple, List, Dict, Union
-
-from rxn.chemutils.tokenization import tokenize_smiles
-from sklearn.model_selection import train_test_split
-import regex as re
-from scipy.interpolate import interp1d
+import ast
+import matplotlib.pyplot as plt
+from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
+from rdkit import RDLogger
 import numpy as np
+import re
+import os
+RDLogger.DisableLog('rdApp.*')
+
+def read_data(path):
+    df = pd.read_parquet(path)
+
+    #  Keep only 1H + 13C
+    df = df[df["NMR_type"].isin(["1H NMR", "13C NMR"])]
+
+    #Keep only molecules having BOTH spectra
+    both_counts = (
+        df.groupby("SMILES")["NMR_type"]
+          .nunique()
+    )
+
+    both_smiles = both_counts[both_counts == 2].index
+
+    df_both = df[df["SMILES"].isin(both_smiles)]
+
+    # Pivot → ONE ROW PER SMILES
+    df_wide = df_both.pivot_table(
+        index="SMILES",
+        columns="NMR_type",
+        values=[
+            "NMR_processed",
+            "NMR_shift_text",
+            "NMR_solvent"
+        ],
+        aggfunc="first"
+    )
+
+    # Flatten MultiIndex columns
+    df_wide.columns = [
+        f"{val}_{nmr.replace(' NMR','')}"
+        for val, nmr in df_wide.columns
+    ]
+
+    df_wide = df_wide.reset_index()
+    df_wide["NMR_processed_13C"] = df_wide["NMR_processed_13C"].apply(ast.literal_eval)
 
 
-def split_data(data: pd.DataFrame, seed: int) -> Tuple[pd.DataFrame]:
-    train, test = train_test_split(data, test_size=0.1, random_state=seed, shuffle=True)
-    train, val = train_test_split(train, test_size=0.05, random_state=seed, shuffle=True)
+    return df_wide
 
-    return train, test, val
+def count_cs(x):
+    try:
+        mol = Chem.MolFromSmiles(x)
 
-def tokenize_formula(formula: str) -> list:
-    return ' '.join(re.findall("[A-Z][a-z]?|\d+|.", formula)) + ' '
+        num_carbons = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-def process_hnmr(multiplets: List[Dict[str, Union[str, float, int]]]) -> str:
-
-    multiplet_str = "1HNMR "
-    for peak in multiplets:
-        range_max = float(peak["rangeMax"]) 
-        range_min = float(peak["rangeMin"]) 
-
-        formatted_peak = ""
-        formatted_peak = formatted_peak + "{:.2f} {:.2f} ".format(range_max, range_min)        
-        formatted_peak = formatted_peak +  "{} {}H ".format(
-                                                            peak["category"],
-                                                            peak["nH"],
-                                                        )
-        js = str(peak["j_values"])
-        if js != "None":
-            split_js = js.split("_")
-            split_js = list(filter(None, split_js))
-            processed_js = ["{:.2f}".format(float(j)) for j in split_js]
-            formatted_js = "J " + " ".join(processed_js)
-            formatted_peak += formatted_js
-
-        multiplet_str += formatted_peak.strip() + " | "
-
-    # Remove last separating token
-    multiplet_str = multiplet_str[:-2]
-    return multiplet_str
-
-def process_cnmr(carbon_nmr: List[Dict[str, Union[str, float, int]]]) -> str:
-    nmr_string = "13CNMR "
-    for peak in carbon_nmr:
-        nmr_string += str(round(float(peak["delta (ppm)"]), 1)) + " "
-
-    return nmr_string
-
-def process_cosy(cosy) -> str:
-    nmr_string = "COSY "
-    for peak in cosy:
-        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
-
-    return nmr_string
-
-def process_hsqc(hsqc) -> str:
-    nmr_string = "HSQC "
-    for peak in hsqc:
-        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
-
-    return nmr_string
-
-def process_hmbc(hmbc) -> str:
-    nmr_string = "HMBC "
-    for peak in hmbc:
-        nmr_string += f"{peak[0]}, {peak[1]}" + " | "
-
-    return nmr_string
-
-def process_nnmr(n_nmr) -> str:
-    nmr_string = "15N "
-    for peak in n_nmr:
-        nmr_string += f"{round(float(peak),1)} | "
-
-    return nmr_string
-
-def process_fnmr(f_nmr) -> str:
-    """Convert a list of fluorine NMR peaks into a formatted string."""
-    nmr_string = "19F "
-
-    # Handle None or empty input
-    if f_nmr is None:
-        return ""
-
-    for peak in f_nmr:
-        nmr_string += f"{round(float(peak), 1)} | "
-    return nmr_string
+        return num_carbons
+    except:
+        return np.nan
 
 
-def process_ir(ir: np.ndarray, interpolation_points: int = 400) -> str:
-    original_x = np.linspace(400, 4000, 1800)
-    interpolation_x = np.linspace(400, 4000, interpolation_points)
+def plot_carbon_shifts(df):
+    df["NMR_13C_count"] = df["NMR_processed_13C"].apply(len)
+    df["c_atom_count"] = df["SMILES"].apply(count_cs)
+
+    success_fraction = (df["NMR_13C_count"] <= df["c_atom_count"]).mean()
+    print(f"in {success_fraction*100}% of the molecules teh number of carbon atoms and shifts matched")
+    print(df["c_atom_count"])
+    print("NMR_13C_count")
+
+
+
+    plt.scatter(df["c_atom_count"], df["NMR_13C_count"], alpha = 0.01, s=10)
+    plt.plot([0,60], [0,60], color ="red")
+    plt.xlim(0,60)
+    plt.ylim(0,60)
+    plt.title("Carbon Shifts in NMREXP")
+    plt.xlabel("C Atom Count")
+    plt.ylabel("Number of C shifts")
+
+    # print(df[["NMR_13C_count"]])
+    # print(df[["c_atom_count"]])
+    plt.savefig("carbon_shifts.png")
+
+SMILES_TOKENIZER = re.compile(
+    r"(\[[^\]]+]|Br|Cl|Si|Se|Na|Li|Ca|Mg|Al|"
+    r"@@?|=|#|-|\+|\\|\/|\(|\)|\.|"
+    r"\d+|[A-Za-z])"
+)
+
+def smiles_to_formula(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    formula = rdMolDescriptors.CalcMolFormula(mol)
+
+    tokens = SMILES_TOKENIZER.findall(formula)
+    return " ".join(tokens)
+
+# tokenises the smiles
+def tokenise_smiles(smiles):
+    tokens = SMILES_TOKENIZER.findall(smiles)
+    return " ".join(tokens)
+
+
+def flatten_spectrum(spectrum):
+    flat_list = []
+    for item in spectrum:
+        if isinstance(item, list):  # if item is a sublist
+            flat_list.extend(item)   # add all elements of sublist
+        else:
+            flat_list.append(item)   # add the item itself
+    return flat_list
+
+def tokenise_carbon_shifts(carbon_list):
+    carbon_shifts = [sublist[0] for sublist in carbon_list]
+    carbon_shifts = flatten_spectrum(carbon_shifts)
+    # checks that the list is flat
+
+    carbon_shifts.sort(reverse=True)
+
+    # Convert each number to string, then join with space
+
+    carbon_string = " ".join(str(round(x, 1)) for x in carbon_shifts)
+    carbon_string = f"13CNMR {carbon_string}"
+    return carbon_string
+
+def tokenise_proton_shifts(proton_list):
+    # tries to turn the strings into tuples
+    try:
+        proton_list = ast.literal_eval(proton_list)
+    except Exception as e:
+        print("Failed to parse proton_list:", e)
+        return np.nan
+
+    proton_list = sorted(proton_list, key=lambda x: (x[3]+x[4]), reverse= True)
+
+    proton_string = "HNMR "
+    for peak in proton_list:
+        # calculates shift
+        shift = (peak[3]+peak[4])/2
+ 
+        # unpacks the coupling value
+        
+        if len(peak[1]) == 0 or (peak[1] is None):
+            coupling = ""
+        elif len(peak[1]) == 1:
+            coupling = f"{peak[1][0]} "
+        elif len(peak[1]) == 2:
+            coupling = f"{peak[1][0]} {peak[1][1]} "
+        else:
+            coupling = ""
+
+        # builds the proton string 
+        proton_string = f"{proton_string}{round(shift, 2)} {peak[0]} {coupling}{peak[2]} | "
+
+    return proton_string
+
+
+
 
     
-    interp = interp1d(original_x, ir)
-    interp_ir = interp(interpolation_x)
+def create_input_strings(df):
+    # creates a coloumn which contains tokenised molecular formulae
+    df["molecular_formula"] = df["SMILES"].apply(smiles_to_formula)
 
-    # Normalise
-    interp_ir = interp_ir + abs(min(interp_ir))
-    interp_ir = (interp_ir / max(interp_ir)) * 100 
-    interp_ir = np.round(interp_ir, decimals=0).astype(int).astype(str)
-    return 'IR ' + ' '.join(interp_ir) + ' '
+    df["tokenised_carbons"] = df["NMR_processed_13C"].apply(tokenise_carbon_shifts)
 
-def process_msms(msms: List[List[float]]) -> List[str]:
-    msms_string = ''
-    for peak in msms:
-        msms_string = msms_string + "{:.1f} {:.1f} ".format(
-            round(peak[0], 1), round(peak[1], 1)
-        )
-    return msms_string
+    df["tokenised_proton"] = df["NMR_processed_1H"].apply(tokenise_proton_shifts)
 
+    df["tokenised_smiles"] = df["SMILES"].apply(tokenise_smiles)
 
-def tokenise_data(
-    data: pd.DataFrame,
-    h_nmr: bool, 
-    c_nmr: bool,
-    ir: bool,
-    pos_msms: bool, 
-    neg_msms: bool,
-    formula: bool,
-    cosy: bool,
-    hsqc: bool,
-    hmbc: bool,
-    f_nmr: bool,
-    n_nmr: bool
-):
-    input_list = list()
+    return df
 
-    for i in tqdm(range(len(data))):
-        tokenized_formula = tokenize_formula(data.iloc[i]['molecular_formula'])
-        
-        if formula:
-            tokenized_input = tokenized_formula
-        else:
-            tokenized_input = ''
+def split_data(df):
+    # shuffle the dataframe
+    df_shuffled = df.sample(frac=1, random_state=42)
 
-        if h_nmr:
-            h_nmr_string = process_hnmr(data.iloc[i]['h_nmr_peaks'])
-            tokenized_input += h_nmr_string
+    # compute split indices
+    n = len(df_shuffled)
+    train_end = int(0.9 * n)
+    val_end = int(0.95 * n)
 
-        if c_nmr:
-            c_nmr_string = process_cnmr(data.iloc[i]['c_nmr_peaks'])
-            tokenized_input += c_nmr_string
+    # split
+    df_train = df_shuffled.iloc[:train_end]
+    df_val = df_shuffled.iloc[train_end:val_end]
+    df_test = df_shuffled.iloc[val_end:]
 
-        if cosy:
-            cosy_string = process_cosy(data.iloc[i]['cosy'])
-            tokenized_input += cosy_string
-        
-        if hsqc:
-            hsqc_string = process_hsqc(data.iloc[i]['hsqc'])
-            tokenized_input += hsqc_string
+    return df_train, df_val, df_test
 
-        if hmbc:
-            hmbc_string = process_hmbc(data.iloc[i]['hmbc'])
-            tokenized_input += hmbc_string
-        
-        if f_nmr:
-            f_nmr_string = process_fnmr(data.iloc[i]['fluorine'])
-            tokenized_input += f_nmr_string
-        
-        if n_nmr:
-            n_nmr_string = process_nnmr(data.iloc[i]['nitrogen'])
-            tokenized_input += n_nmr_string
+def write_files(df, folder_name):
+    os.makedirs(folder_name, exist_ok=True)
 
-        if ir:
-            ir_string = process_ir(data.iloc[i]["ir_spectra"])
-            tokenized_input += ir_string
+    df["src"] = df["molecular_formula"] + " " + df["tokenised_proton"] + " " + df["tokenised_carbons"]
 
-        if pos_msms:
-            pos_msms_string = ''
-            pos_msms_string += "E0Pos " + process_msms(data.iloc[i]["msms_positive_10ev"])
-            pos_msms_string += "E1Pos " + process_msms(data.iloc[i]["msms_positive_20ev"])
-            pos_msms_string += "E2Pos " + process_msms(data.iloc[i]["msms_positive_40ev"])
-            tokenized_input += pos_msms_string
+    df_train, df_val, df_test = split_data(df)
 
-        if neg_msms:
-            neg_msms_string = ''
-            neg_msms_string += "E0Neg " + process_msms(data.iloc[i]["msms_negative_10ev"])
-            neg_msms_string += "E1Neg " + process_msms(data.iloc[i]["msms_negative_20ev"])
-            neg_msms_string += "E2Neg " + process_msms(data.iloc[i]["msms_negative_40ev"])
-            tokenized_input += neg_msms_string
-        
-        tokenized_target = tokenize_smiles(data.iloc[i]["smiles"])
-        input_list.append({'source': tokenized_input.strip(), 'target': tokenized_target})
+    # writes the src files
+    df_train["src"].to_csv(f"{folder_name}/src-train.txt", index=False, header=False)
+    df_val["src"].to_csv(f"{folder_name}/src-val.txt", index =False, header = False)
+    df_test["src"].to_csv(f"{folder_name}/src-test.txt", index=False, header=False)
+
+    df_train["tokenised_smiles"].to_csv(f"{folder_name}/tgt-train.txt", index=False, header=False)
+    df_val["tokenised_smiles"].to_csv(f"{folder_name}/tgt-val.txt", index =False, header = False)
+    df_test["tokenised_smiles"].to_csv(f"{folder_name}/tgt-test.txt", index=False, header=False)
 
 
 
+def main():
+    path = '../../nmrexp/NMRexp_10to24_1_1004.parquet'
 
+    # reads data
+    df = read_data(path)
 
-    input_df = pd.DataFrame(input_list)
-    input_df = input_df.drop_duplicates(subset="source")
+    # creates the input strings
+    df = create_input_strings(df)
 
-    return input_df
+    # writes the src and tgt .txt files
+    write_files(df, "../expt_train/data")
 
-
-def save_set(data_set: pd.DataFrame, out_path: Path, set_type: str, pred_spectra: bool) -> None:
-    out_path.mkdir(parents=True, exist_ok=True)
-
-    smiles = list(data_set.target)
-    spectra = data_set.source
-
-    with (out_path / f"src-{set_type}.txt").open("w") as f:
-        if pred_spectra:
-            src = smiles
-        else:
-            src = spectra
-
-        for item in src:
-            f.write(f"{item}\n")
-        
-    with (out_path / f"tgt-{set_type}.txt").open("w") as f:
-        if pred_spectra:
-            tgt = spectra
-        else:
-            tgt = smiles
-
-        for item in tgt:
-            f.write(f"{item}\n")
-
-
-@click.command()
-@click.option(
-    "--analytical_data",
-    "-n",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to the NMR dataframe",
-)
-@click.option(
-    "--out_path",
-    "-o",
-    type=click.Path(path_type=Path),
-    required=True,
-    help="Output path",
-)
-@click.option("--h_nmr", is_flag=True)
-@click.option("--c_nmr", is_flag=True)
-@click.option("--ir", is_flag=True)
-@click.option("--pos_msms", is_flag=True)
-@click.option("--neg_msms", is_flag=True)
-@click.option("--formula", is_flag=True)
-@click.option("--pred_spectra", is_flag=True)
-@click.option("--seed", type=int, default=3245)
-@click.option("--cosy", is_flag=True)
-@click.option("--hsqc", is_flag=True)
-@click.option("--hmbc", is_flag=True)
-@click.option("--f_nmr", is_flag=True)
-@click.option("--n_nmr", is_flag=True)
-def main(
-    analytical_data: Path,
-    out_path: Path,
-    h_nmr: bool = False,
-    c_nmr: bool = False,
-    ir: bool = False,
-    pos_msms: bool = False,
-    neg_msms: bool = False,
-    formula: bool = True,
-    pred_spectra: bool = False,
-    seed: int = 3245,
-    cosy: bool = False,
-    hsqc: bool = False,
-    hmbc: bool = False,
-    f_nmr: bool = False,
-    n_nmr: bool = False
-):  
-    
-    # Make the training data
-    count = 1 
-    tokenised_data = list()
-    for parquet_file in tqdm(analytical_data.glob("*.parquet"), total=245):
-
-        if count < 1000:
-            print(f"working on {parquet_file.stem}")
-            data = pd.read_parquet(parquet_file)
-            tokenised_data.append(tokenise_data(data, h_nmr, c_nmr, ir, pos_msms, neg_msms, formula, cosy, hsqc, hmbc, f_nmr, n_nmr))
-            del data
-        count = count + 1
-
-
-    tokenised_data = pd.concat(tokenised_data)
-
-    train_set, test_set, val_set = split_data(tokenised_data, seed)
-
-    # Save training data
-    out_data_path = out_path / "data"
-    save_set(test_set, out_data_path, "test", pred_spectra)
-    save_set(train_set, out_data_path, "train", pred_spectra)
-    save_set(val_set, out_data_path, "val", pred_spectra)
-
-if __name__ == '__main__':
-    main()
+main()
